@@ -27,15 +27,26 @@ def search_youtube_videos(query, max_results=5, api_key=youtube_api):
 
     videos = []
     for item in response.get("items", []):
-        title = item["snippet"]["title"]
-        description = item["snippet"]["description"]
-        video_id = item["id"]["videoId"]
-        url = f"https://www.youtube.com/watch?v={video_id}"
-        videos.append({
-            "title": title,
-            "description": description,
-            "url": url
-        })
+        if item["id"]["kind"] != "youtube#video":
+            title = item["snippet"]["title"]
+            description = item["snippet"]["description"]
+            playlist_id = item["id"]["playlistId"]
+            url = f"https://www.youtube.com/playlist?list={playlist_id}"
+            videos.append({
+                "title": title,
+                "description": description,
+                "url": url
+            })
+        else:
+            title = item["snippet"]["title"]
+            description = item["snippet"]["description"]
+            video_id = item["id"]["videoId"]
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            videos.append({
+                "title": title,
+                "description": description,
+                "url": url
+            })
 
     return videos
 
