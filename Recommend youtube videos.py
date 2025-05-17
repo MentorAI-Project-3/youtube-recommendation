@@ -6,17 +6,17 @@ from googleapiclient.discovery import build
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 
-load_dotenv(".env")
+load_dotenv()
 
 # Load youtube API key
 youtube_api = os.getenv("YOUTUBE_API_KEY") 
-# print("Youtube API Key: ", youtube_api)
+print("Youtube API Key: ", youtube_api)
 
 # Importent variables
 MAX_RESULTS = 10
 
 # Function to search for videos on YouTube
-def search_youtube_videos(query, max_results=5, api_key=youtube_api):
+def search_youtube_videos(query, max_results=5 ): #, api_key=youtube_api):
     youtube = build("youtube", "v3", developerKey = youtube_api)
     response = youtube.search().list(
         q=query,
@@ -78,7 +78,7 @@ Give reasult including the title and link only in the following format:
 
 # Function to recommend videos using LLM
 def recommend_videos_with_llm(user_query):
-    videos = search_youtube_videos(user_query, MAX_RESULTS, youtube_api)
+    videos = search_youtube_videos(user_query, MAX_RESULTS) #, youtube_api)
     formatted_list = formate_videos_metadata(videos)
     prompt_template = prompt(user_query, formatted_list)
     videos = search_youtube_videos(user_query, MAX_RESULTS)
