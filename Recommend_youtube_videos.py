@@ -10,45 +10,50 @@ load_dotenv()
 
 # Load youtube API key
 youtube_api = os.getenv("YOUTUBE_API_KEY") 
-print("Youtube API Key: ", youtube_api)
+
 
 # Importent variables
 MAX_RESULTS = 10
 
 # Function to search for videos on YouTube
-def search_youtube_videos(query, max_results=5 ): #, api_key=youtube_api):
-    youtube = build("youtube", "v3", developerKey = youtube_api)
-    response = youtube.search().list(
-        q=query,
-        part="snippet", # 
-        maxResults=max_results,
-        type="video"
-    ).execute()
+def search_youtube_videos(query, max_results=5):
+    # youtube_api = os.getenv("YOUTUBE_API_KEY")
+    try:
+        youtube = build("youtube", "v3", developerKey=youtube_api)
+        response = youtube.search().list(
+            q=query,
+            part="snippet",
+            maxResults=max_results,
+            type=["video", "playlist"],
+        ).execute()
 
-    videos = []
-    for item in response.get("items", []):
-        if item["id"]["kind"] != "youtube#video":
-            title = item["snippet"]["title"]
-            description = item["snippet"]["description"]
-            playlist_id = item["id"]["playlistId"]
-            url = f"https://www.youtube.com/playlist?list={playlist_id}"
-            videos.append({
-                "title": title,
-                "description": description,
-                "url": url
-            })
-        else:
-            title = item["snippet"]["title"]
-            description = item["snippet"]["description"]
-            video_id = item["id"]["videoId"]
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            videos.append({
-                "title": title,
-                "description": description,
-                "url": url
-            })
 
-    return videos
+        videos = []
+        for item in response.get("items", []):
+            if item["id"]["kind"] != "youtube#video":
+                title = item["snippet"]["title"]
+                description = item["snippet"]["description"]
+                playlist_id = item["id"]["playlistId"]
+                url = f"https://www.youtube.com/playlist?list={playlist_id}"
+                videos.append({
+                    "title": title,
+                    "description": description,
+                    "url": url
+                })
+            else:
+                title = item["snippet"]["title"]
+                description = item["snippet"]["description"]
+                video_id = item["id"]["videoId"]
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                videos.append({
+                    "title": title,
+                    "description": description,
+                    "url": url
+                })
+        return videos
+    except Exception as e:
+        return f"Error: {e}"
+
 
 # Function to format video metadata
 def formate_videos_metadata(videos):
@@ -64,38 +69,47 @@ def prompt(user_query, video_metadata_list):
         input_variables=["user_query", "video_metadata_list"],
         template= """
 You are an intelligent assistant helping users find the best YouTube videos.
-User query: "{user_query}"
+
+User message: "{user_query}"
+
 From the following videos, recommend the top 3 that are most relevant and useful:
+
 {video_metadata_list}
 
 Give reasult including the title and link only in the following format:
 1. Title: video title, Link: video link
 2. Title: video title, Link: video link
 3. Title: video title, Link: video link
+
 """
 )
+   
     return prompt_template
 
 # Function to recommend videos using LLM
 def recommend_videos_with_llm(user_query):
-    videos = search_youtube_videos(user_query, MAX_RESULTS) #, youtube_api)
-    formatted_list = formate_videos_metadata(videos)
-    prompt_template = prompt(user_query, formatted_list)
     videos = search_youtube_videos(user_query, MAX_RESULTS)
-    formatted_list = formate_videos_metadata(videos)
+    if type(videos) == list: 
+        formatted_list = formate_videos_metadata(videos)
+        prompt_template = prompt(user_query, formatted_list)
+        try:
+            llm = ChatGroq(
+                model="llama3-8b-8192",
+                temperature=0.5
+                # ,api_key = GROQ_API_KEY
+            )
 
-    llm = ChatGroq(
-        model="llama3-8b-8192",
-        temperature=0.5
-    )
+            model = LLMChain(llm=llm, prompt=prompt_template)
+            response = model.invoke({
+                "user_query": user_query,
+                "video_metadata_list": formatted_list
+            })
 
-    chain = LLMChain(llm=llm, prompt=prompt_template)
-    response = chain.invoke({
-        "user_query": user_query,
-        "video_metadata_list": formatted_list
-    })
-
-    return response["text"]
+            return response["text"]
+        except Exception as e:
+            return f"Error: {e}"
+    else:
+        return f"Error: {videos}"
 
 # Main Code
 def main():
