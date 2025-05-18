@@ -11,3 +11,7 @@
  ``` python
 pip install -r requirements.txt
 ```
+-------------------------------------------------------------------------------------------------------------------------------------
+
+### Important Note
+**If you face any problems or errors when using the code, or if you have any notes — even small ones —, be free to tell me.**
