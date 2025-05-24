@@ -5,11 +5,12 @@ from langchain.chains import LLMChain
 from googleapiclient.discovery import build
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
+import isodate
 
 load_dotenv()
 
 # Load youtube API key
-youtube_api = os.getenv("YOUTUBE_API_KEY") 
+youtude_api = os.getenv("YOUTUBE_API_KEY") 
 
 
 # Importent variables
@@ -17,9 +18,9 @@ MAX_RESULTS = 10
 
 # Function to search for videos on YouTube
 def search_youtube_videos(query, max_results=5):
-    # youtube_api = os.getenv("YOUTUBE_API_KEY")
+    # youtube_api = os.getenv("YOUTUBE_API_KEY")    
     try:
-        youtube = build("youtube", "v3", developerKey=youtube_api)
+        youtube = build("youtube", "v3", developerKey=youtude_api)
         response = youtube.search().list(
             q=query,
             part="snippet",
@@ -27,6 +28,7 @@ def search_youtube_videos(query, max_results=5):
             type=["video", "playlist"],
         ).execute()
 
+        # print(response)
 
         videos = []
         for item in response.get("items", []):
@@ -41,19 +43,41 @@ def search_youtube_videos(query, max_results=5):
                     "url": url
                 })
             else:
-                title = item["snippet"]["title"]
-                description = item["snippet"]["description"]
-                video_id = item["id"]["videoId"]
-                url = f"https://www.youtube.com/watch?v={video_id}"
-                videos.append({
-                    "title": title,
-                    "description": description,
-                    "url": url
-                })
+                id = item["id"]["videoId"]
+                video_data = get_video_details(id)
+                if video_data:
+                    videos.append(video_data)
+                
         return videos
     except Exception as e:
         return f"Error: {e}"
 
+def get_video_details(video_id):
+    youtube = build('youtube', 'v3', developerKey=youtude_api)
+    
+    response = youtube.videos().list(
+        part="snippet,contentDetails,statistics",
+        id=video_id
+    ).execute()
+
+    if not response['items']:
+        return None
+
+    video = response['items'][0]
+    
+    data = {
+        'title': video ['snippet']['title'],
+        'description': video['snippet']['description'],
+        'url': f"https://www.youtube.com/watch?v={video_id}",
+        'views': int(video['statistics'].get('viewCount', 0)),
+        'likes': int(video['statistics'].get('likeCount', 0)),
+        'duration': video['contentDetails']['duration']
+    } 
+    data['duration'] = isodate.parse_duration(data['duration']).total_seconds()
+    if data['duration'] >= 300:
+        return data
+    else:
+        return None
 
 # Function to format video metadata
 def formate_videos_metadata(videos):
@@ -72,7 +96,7 @@ You are an intelligent assistant helping users find the best YouTube videos.
 
 User message: "{user_query}"
 
-From the following videos, recommend the top 3 that are most relevant and useful:
+From the following videos, recommend the top 3 that are most relevant and useful, and most likely to be watched by the user from the following list:
 
 {video_metadata_list}
 
@@ -95,8 +119,8 @@ def recommend_videos_with_llm(user_query):
         try:
             llm = ChatGroq(
                 model="llama3-8b-8192",
-                temperature=0.5
-                # ,api_key = GROQ_API_KEY
+                temperature=0.5,
+                max_retries=3 
             )
 
             model = LLMChain(llm=llm, prompt=prompt_template)
